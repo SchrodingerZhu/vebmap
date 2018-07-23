@@ -2,7 +2,7 @@ defmodule VebmapTest do
   use ExUnit.Case
   doctest Vebmap
 
-  test "greets the world" do
-    assert Vebmap.hello() == :world
+  test "one truth" do
+    assert 1 + 1 == 2
   end
 end
