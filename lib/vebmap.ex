@@ -41,7 +41,7 @@ defmodule Vebmap do
   def fetch!(vebmap, key) do
     case fetch(vebmap, key) do
       :error -> raise(Vebmap.KeyError, key)
-      res -> res
+      {:ok, res} -> res
     end
   end
 
@@ -50,7 +50,7 @@ defmodule Vebmap do
   end
 
   def get(vebmap, key, default \\ nil) do
-    Map.get(vebmap, key, default)
+    Map.get(vebmap.map, key, default)
   end
 
   def get_and_update!(vebmap, key, fun) do
@@ -100,20 +100,28 @@ defmodule Vebmap do
 
   def merge(vebmap1, vebmap2) do
     map = Map.merge(vebmap1.map, vebmap2.map)
-    the_keys = keys(vebmap2)
-    %Vebmap{veb: put_keys(vebmap1.veb, the_keys), map: map}
+
+    if vebmap1.veb.log_u >= vebmap2.veb.log_u do
+      the_keys = keys(vebmap2)
+      %Vebmap{veb: put_keys(vebmap1.veb, the_keys), map: map}
+    else
+      the_keys = keys(vebmap1)
+      %Vebmap{veb: put_keys(vebmap2.veb, the_keys), map: map}
+    end
   end
 
   defp put_keys(veb, []), do: veb
   defp put_keys(veb, [head | tail]), do: put_keys(Veb.insert(veb, head), tail)
 
   def merge(vebmap1, vebmap2, fun) do
+    map = Map.merge(vebmap1.map, vebmap2.map, fun)
+
     if vebmap1.veb.log_u >= vebmap2.veb.log_u do
-      map = Map.merge(vebmap1.map, vebmap2.map, fun)
       the_keys = keys(vebmap2)
       %Vebmap{veb: put_keys(vebmap1.veb, the_keys), map: map}
     else
-      merge(vebmap2, vebmap1, fun)
+      the_keys = keys(vebmap1)
+      %Vebmap{veb: put_keys(vebmap2.veb, the_keys), map: map}
     end
   end
 
@@ -138,7 +146,15 @@ defmodule Vebmap do
   end
 
   def put(vebmap, key, value) do
-    %Vebmap{veb: Veb.insert(vebmap.veb, key), map: Map.put(vebmap.map, key, value)}
+    if key < 1 <<< vebmap.veb.log_u do
+      %Vebmap{veb: Veb.insert(vebmap.veb, key), map: Map.put(vebmap.map, key, value)}
+    else
+      :error
+    end
+  end
+
+  def upgrade_capacity(vebmap, new_limit) do
+    %Vebmap{veb: vebmap |> keys() |> Veb.from_list(new_limit, :by_max), map: vebmap.map}
   end
 
   def put_new(vebmap, key, value) do
@@ -173,11 +189,9 @@ defmodule Vebmap do
   end
 
   def take(vebmap, keys, limit \\ @default_limit, mode \\ :auto) do
-    map  = Map.take(vebmap.map, keys)
+    map = Map.take(vebmap.map, keys)
     %Vebmap{veb: map |> Map.keys() |> Veb.from_list(limit, mode), map: map}
   end
-
-  def to_list(vebmap), do: Map.to_list(vebmap.map)
 
   def update(vebmap, key, initial, fun) do
     if has_key?(vebmap, key) do
@@ -204,5 +218,19 @@ defmodule Vebmap do
   def pred_key(vebmap, key), do: Veb.pred(vebmap.veb, key)
   def succ_key(vebmap, key), do: Veb.succ(vebmap.veb, key)
 
+  def to_list(vebmap) do
+    vebmap.veb
+    |> Veb.to_list()
+    |> Enum.map(fn key -> {key, vebmap[key]} end)
+  end
+  def to_map(vebmap) do
+    vebmap.map
+  end
+end
+defimpl Inspect, for: Vebmap do
+  def inspect(vebmap, _opt \\ nil) do
+    "%Vebmap{capacity = #{Vebmap.capacity?(vebmap)}, elements = " <> Kernel.inspect(Vebmap.to_list(vebmap)) <> "}"
+  end
 
 end
+
