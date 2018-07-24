@@ -226,7 +226,44 @@ defmodule Vebmap do
   def to_map(vebmap) do
     vebmap.map
   end
+
+  def slice(vebmap, start, nums) do
+    veb_list =
+      Enum.slice(vebmap.veb, start, nums)
+    map =
+      veb_list
+      |> Enum.map(fn key -> {key, vebmap.map[key]} end)
+      |> make_sliced_map(Map.new())
+    %Vebmap{veb: Veb.from_list(veb_list, 1 <<< vebmap.veb.log_u, :by_u), map: map}
+  end
+
+  defp make_sliced_map([], map), do: map
+  defp make_sliced_map([{key, value} | tail], map), do: make_sliced_map(tail, Map.put(map, key, value))
 end
+defimpl Enumerable,for: Vebmap do
+  def count(vebmap) do
+    {:ok, Enum.count(vebmap.map)}
+  end
+  def member?(vebmap, element) do
+    {:ok, Enum.member?(vebmap.map, element)}
+  end
+
+  def slice(vebmap) do
+    {:ok, Enum.count(vebmap), fn (start, nums) -> vebmap |> Vebmap.slice(start, nums) |> Vebmap.to_list() end}
+  end
+
+  def reduce(v, acc, fun) do
+    reduce_vebmap({v, v.veb.min}, acc, fun)
+  end
+
+  defp reduce_vebmap(_, {:halt, acc}, _fun), do: {:halted, acc}
+  defp reduce_vebmap({v, cur}, {:suspend, acc}, fun), do: {:suspended, acc, &reduce_vebmap({v, cur}, &1, fun)}
+  defp reduce_vebmap({_v, nil}, {:cont, acc}, _fun), do: {:done, acc}
+  defp reduce_vebmap({v, cur}, {:cont, acc}, fun), do: reduce_vebmap({v, Veb.succ(v.veb, cur)}, fun.({cur, v.map[cur]}, acc), fun)
+
+end
+
+
 defimpl Inspect, for: Vebmap do
   def inspect(vebmap, _opt \\ nil) do
     "%Vebmap{capacity = #{Vebmap.capacity?(vebmap)}, elements = " <> Kernel.inspect(Vebmap.to_list(vebmap)) <> "}"
