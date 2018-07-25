@@ -41,7 +41,7 @@ defmodule VebmapTest do
     {_, vebmap} = gen_data()
     for(i <- 1..1_000 |> Enum.map(fn _ -> Enum.random(@default_range) end)) do
         new_vebmap = random_delete(vebmap, 100)
-        assert Vebmap.capacity?(new_vebmap) == Vebmap.capacity?(vebmap)
+        assert Vebmap.capacity(new_vebmap) == Vebmap.capacity(vebmap)
         assert Vebmap.pred_key(new_vebmap, i) == Veb.pred(new_vebmap.veb, i)
         assert Vebmap.succ_key(new_vebmap, i) == Veb.succ(new_vebmap.veb, i)
     end
