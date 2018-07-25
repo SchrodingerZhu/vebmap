@@ -42,7 +42,7 @@ defmodule Vebmap.Mixfile do
   end
   defp package do
     [
-      name: :veb,
+      name: :vebmap,
       licenses: ["MIT"],
       maintainers: ["SchrodingerZhu(朱一帆)"],
       links: %{"SchrodingerZhu's GitHub" => "https://github.com/SchrodingerZhu"},
