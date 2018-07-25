@@ -1,6 +1,6 @@
 defmodule Vebmap.KeyError do
   defexception [:message]
-  
+
   def exception(key) do
     %Vebmap.KeyError{message: "this vebmap doesn\'t have the key #{key}"}
   end
@@ -13,12 +13,23 @@ defmodule Vebmap do
   @moduledoc """
   Documentation for Vebmap. Vebmap combines the RS-vEB data structure and the map together, providing nearly all of the interfaces in the Map module and supporting the predecessor and successor access. Now it also support the protocols of Collectable, Inspect and Enumerable.
   """
-  
+
   defstruct veb: Veb.new(@default_limit), map: Map.new()
   @type key :: integer
   @type value :: any
   @type t :: %Vebmap{veb: Veb.t(), map: %{key => value}}
-  @compile {:inline, fetch: 2, fetch!: 2, get: 2, put: 3, delete: 2, has_key?: 2, replace!: 3, capacity: 1, max_limit: 1, pred_key: 2, succ_key: 2}
+  @compile {:inline,
+            fetch: 2,
+            fetch!: 2,
+            get: 2,
+            put: 3,
+            delete: 2,
+            has_key?: 2,
+            replace!: 3,
+            capacity: 1,
+            max_limit: 1,
+            pred_key: 2,
+            succ_key: 2}
 
   @spec new(non_neg_integer, :by_max | :by_u | :by_logu) :: t
   def new(limit, mode \\ :by_max) do
@@ -55,7 +66,8 @@ defmodule Vebmap do
     Map.get(vebmap.map, key, default)
   end
 
-  @spec get_and_update!(t, key, (value -> {get, value} | :pop)) :: {get, t} | no_return when get: term
+  @spec get_and_update!(t, key, (value -> {get, value} | :pop)) :: {get, t} | no_return
+        when get: term
   def get_and_update!(vebmap, key, fun) do
     value = fetch!(vebmap.map, key)
 
@@ -117,7 +129,7 @@ defmodule Vebmap do
       %Vebmap{veb: put_keys(vebmap2.veb, the_keys), map: map}
     end
   end
-  
+
   defp put_keys(veb, []), do: veb
   defp put_keys(veb, [head | tail]), do: put_keys(Veb.insert(veb, head), tail)
 
@@ -134,7 +146,7 @@ defmodule Vebmap do
     end
   end
 
-  @spec from_enum(Enumerable.t(), non_neg_integer,  :auto | :by_max | :by_u | :by_logu) :: t
+  @spec from_enum(Enumerable.t(), non_neg_integer, :auto | :by_max | :by_u | :by_logu) :: t
   def from_enum(enumerable, limit \\ @default_limit, mode \\ :auto) do
     map = Map.new(enumerable)
     the_keys = Map.keys(map)
@@ -168,7 +180,7 @@ defmodule Vebmap do
 
   @spec upgrade_capacity(t, non_neg_integer) :: t | :error
   def upgrade_capacity(vebmap, new_limit) do
-    if new_limit >= (1 <<< vebmap.veb.log_u) do
+    if new_limit >= 1 <<< vebmap.veb.log_u do
       %Vebmap{veb: vebmap |> keys() |> Veb.from_list(new_limit, :by_max), map: vebmap.map}
     else
       :error
