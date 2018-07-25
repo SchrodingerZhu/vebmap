@@ -12,11 +12,31 @@ defmodule Vebmap do
   @behaviour Access
   @moduledoc """
   Documentation for Vebmap. Vebmap combines the RS-vEB data structure and the map together, providing nearly all of the interfaces in the Map module and supporting the predecessor and successor access. Now it also support the protocols of Collectable, Inspect and Enumerable.
+
+  To get the size of a vebmap, please use `Enum.count/1`:
+
+      iex> [{0, 0}, {1, 1}, {2, 2}] |> Vebmap.from_enum() |> Enum.count()
+      3
+
+  Here is an example of how a vebmap is inspected:
+
+      iex> [{0, 0}, {1, 1}, {2, 2}] |> Vebmap.from_enum()
+      #Vebmap<[capacity = 4, elements = [{0, 0}, {1, 1}, {2, 2}]]>
+
+  As you can see, when inspecting a vebmap, you will get the capacity and the pairs of keys and values. Note that in a vebmap, the keys must be non_neg_integers and the order of the elements is determined by the keys in the order of integers rather than the hash values of the keys in maps.
   """
 
   defstruct veb: Veb.new(@default_limit), map: Map.new()
-  @type key :: integer
+
+  @typedoc """
+  As it is said in the `moduledoc`, the keys are non_neg_integers.
+  """
+  @type key :: non_neg_integer
   @type value :: any
+
+  @typedoc """
+  `Vebmap.t()` is the type of vebmap.
+  """
   @type t :: %Vebmap{veb: Veb.t(), map: %{key => value}}
   @compile {:inline,
             fetch: 2,
@@ -31,23 +51,74 @@ defmodule Vebmap do
             pred_key: 2,
             succ_key: 2}
 
+  @doc """
+  `Vebmap.new/2` provides a way to get a grand new vebmap. The two arguments determines the capacity of the new vebmap.There are three modes: `:by_max`, `:by_u` and `:by_logu` and `by_max` is set as the default mode.
+  When using `:by_max`, the `limit` argument should pass the maximum value of your keys, and the program will automatically determines the least adequate capacity.
+  As for `:by_u`, you should provide an nth power of 2 in the limit field which is going to be your capacity.
+  And if you use `:by_logu`, please pass the maximum number of the binary bits of all your keys.
+
+  Here are the examples:
+
+      iex> Vebmap.new(3)
+      #Vebmap<[capacity = 4, elements = []]>
+      iex> Vebmap.new(8, :by_u)
+      #Vebmap<[capacity = 8, elements = []]>
+      iex> Vebmap.new(5, :by_logu)
+      #Vebmap<[capacity = 32, elements = []]>
+
+  """
   @spec new(non_neg_integer, :by_max | :by_u | :by_logu) :: t
   def new(limit, mode \\ :by_max) do
     %Vebmap{veb: Veb.new(limit, mode), map: Map.new()}
   end
 
+  @doc """
+  `Vebmap.delete/2` will help you delete the provided key and its value from a vebmap:
+
+      iex> [{0, 0}, {1, 1}] |> Vebmap.from_enum() |> Vebmap.delete(0)
+      #Vebmap<[capacity = 2, elements = [{1, 1}]]>
+      iex> [{0, 0}, {1, 1}] |> Vebmap.from_enum() |> Vebmap.delete(2)
+      #Vebmap<[capacity = 2, elements = [{0, 0}, {1, 1}]]>
+
+  """
   @spec delete(t, key) :: t
   def delete(vebmap, key) do
     %Vebmap{veb: vebmap.veb |> Veb.delete(key), map: vebmap.map |> Map.delete(key)}
   end
 
+  @doc """
+  Drops the given value from a vebmap:
+      iex> [{0, 0}, {1, 1}] |> Vebmap.from_enum() |> Vebmap.drop([0])
+      #Vebmap<[capacity = 2, elements = [{1, 1}]]>
+  """
   @spec drop(t, [key]) :: t
   def drop(vebmap, []), do: vebmap
   def drop(vebmap, [head | tail]), do: drop(delete(vebmap, head), tail)
 
+  @doc """
+  Check if tow given vebmap are the same one.
+
+      iex> [{0, 0}, {1, 1}] |> Vebmap.from_enum() |> Vebmap.drop([0])
+      #Vebmap<[capacity = 2, elements = [{1, 1}]]>
+      iex> a = [{0, 0}, {1, 1}] |> Vebmap.from_enum()
+      #Vebmap<[capacity = 2, elements = [{0, 0}, {1, 1}]]>
+      iex> b = [{0, 0}, {1, 2}] |> Vebmap.from_enum()
+      #Vebmap<[capacity = 2, elements = [{0, 0}, {1, 2}]]>
+      iex> Vebmap.equal?(a, a)
+      true
+      iex> Vebmap.equal?(a, b)
+      false
+
+  """
   @spec equal?(t, t) :: boolean
   def equal?(vebmap1, vebmap2), do: Map.equal?(vebmap1.map, vebmap2.map)
 
+  @doc """
+  Fetches the value for a specific `key` in the given `vebmap`, erroring out if
+  `vebmap` doesn't contain `key`.
+  If `vebmap` contains the given `key`, the corresponding value is returned. If
+  `vebmap` doesn't contain `key`, a `KeyError` exception is raised.
+  """
   @spec fetch!(t, key) :: value | no_return
   def fetch!(vebmap, key) do
     case fetch(vebmap, key) do
@@ -61,11 +132,22 @@ defmodule Vebmap do
     Map.fetch(vebmap.map, key)
   end
 
+  @doc """
+  Gets the value for a specific `key` in `vebmap`.
+  If `key` is present in `vebmap` with value `value`, then `value` is
+  returned. Otherwise, `default` is returned (which is `nil` unless
+  specified otherwise).
+  """
   @spec get(t, key, value) :: value
   def get(vebmap, key, default \\ nil) do
     Map.get(vebmap.map, key, default)
   end
 
+  @doc """
+  Gets the value from `key` and updates it. Raises if there is no `key`.
+  Behaves exactly like `get_and_update/3`, but raises a `KeyError` exception if
+  `key` is not present in `vebmap`.
+  """
   @spec get_and_update!(t, key, (value -> {get, value} | :pop)) :: {get, t} | no_return
         when get: term
   def get_and_update!(vebmap, key, fun) do
@@ -100,6 +182,13 @@ defmodule Vebmap do
   end
 
   @spec get_lazy(t, key, (() -> value)) :: value
+  @doc """
+  Gets the value for a specific `key` in `vebmap`.
+  If `key` is present in `vebmap` with value `value`, then `value` is
+  returned. Otherwise, `fun` is evaluated and its result is returned.
+  This is useful if the default value is very expensive to calculate or
+  generally difficult to setup and teardown again.
+  """
   def get_lazy(vebmap, key, fun) when is_function(fun, 0) do
     case fetch(vebmap, key) do
       :error -> fun.()
@@ -107,11 +196,17 @@ defmodule Vebmap do
     end
   end
 
+  @doc """
+  Returns whether the given `key` exists in the given `vebmap`.
+  """
   @spec has_key?(t, key) :: boolean
   def has_key?(vebmap, key) do
     Map.has_key?(vebmap.map, key)
   end
 
+  @doc """
+  Returns all keys from `map`.
+  """
   @spec keys(t) :: [key]
   def keys(vebmap) do
     Map.keys(vebmap.map)
@@ -337,8 +432,8 @@ end
 
 defimpl Inspect, for: Vebmap do
   def inspect(vebmap, _opt \\ nil) do
-    "%Vebmap{capacity = #{Vebmap.capacity(vebmap)}, elements = " <>
-      Kernel.inspect(Vebmap.to_list(vebmap)) <> "}"
+    "#Vebmap<[capacity = #{Vebmap.capacity(vebmap)}, elements = " <>
+      Kernel.inspect(Vebmap.to_list(vebmap)) <> "]>"
   end
 end
 
