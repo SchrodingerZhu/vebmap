@@ -212,6 +212,13 @@ defmodule Vebmap do
     Map.keys(vebmap.map)
   end
 
+  @doc """
+  Merges two vebmaps into one.
+
+  All keys in vebmap2 will be added to vebmap1, overriding any existing one (i.e., the keys in vebmap2 “have precedence” over the ones in vebmap1).
+
+  Note that if you merge two vebmaps woth different capacities then the returned vebmap will have the larger capacity.
+  """
   @spec merge(t, t) :: t
   def merge(vebmap1, vebmap2) do
     map = Map.merge(vebmap1.map, vebmap2.map)
@@ -228,6 +235,12 @@ defmodule Vebmap do
   defp put_keys(veb, []), do: veb
   defp put_keys(veb, [head | tail]), do: put_keys(Veb.insert(veb, head), tail)
 
+  @doc """
+  Merges two vebmaps into one, resolving conflicts through the given fun.
+
+  All keys in vebmap2 will be added to vebmap1. The given function will be invoked when there are duplicate keys; its arguments are key (the duplicate key), value1 (the value of key in vebmap1), and value2 (the value of key in vebmap2). The value returned by fun is used as the value under key in the resulting vebmap.
+  Note that if you merge two vebmaps woth different capacities then the returned vebmap will have the larger capacity.
+  """
   @spec merge(t, t, (key, value, value -> value)) :: t
   def merge(vebmap1, vebmap2, fun) do
     map = Map.merge(vebmap1.map, vebmap2.map, fun)
@@ -240,7 +253,10 @@ defmodule Vebmap do
       %Vebmap{veb: put_keys(vebmap2.veb, the_keys), map: map}
     end
   end
-
+  @doc """
+  Construct a new vebmap from an enumerable.
+  Four mode provided, `:auto` will automatically detect the largest key and determine the capacity. `:by_max`, `by_u` and `by_logu` functions the same as in `Vebmap.new/2`
+  """
   @spec from_enum(Enumerable.t(), non_neg_integer, :auto | :by_max | :by_u | :by_logu) :: t
   def from_enum(enumerable, limit \\ @default_limit, mode \\ :auto) do
     map = Map.new(enumerable)
