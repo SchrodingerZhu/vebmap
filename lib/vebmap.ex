@@ -253,6 +253,7 @@ defmodule Vebmap do
       %Vebmap{veb: put_keys(vebmap2.veb, the_keys), map: map}
     end
   end
+
   @doc """
   Construct a new vebmap from an enumerable.
   Four mode provided, `:auto` will automatically detect the largest key and determine the capacity. `:by_max`, `by_u` and `by_logu` functions the same as in `Vebmap.new/2`
